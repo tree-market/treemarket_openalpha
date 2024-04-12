@@ -2,12 +2,10 @@ package main
 
 import (
 	"fmt"
-	"math"
+	"strconv"
 	"time"
-	"tree_service/utils"
 
 	"github.com/deroproject/derohe/rpc"
-	"github.com/deroproject/derohe/walletapi"
 	"github.com/ybbus/jsonrpc"
 )
 
@@ -27,7 +25,7 @@ var expected_arguments = rpc.Arguments{
 
 var response = rpc.Arguments{
 	{Name: rpc.RPC_DESTINATION_PORT, DataType: rpc.DataUint64, Value: uint64(0)},
-	{Name: rpc.RPC_SOURCE_PORT, DataType: rpc.DataUint64, Value: DEST_PORT}, {Name: rpc.RPC_COMMENT, DataType: rpc.DataString, Value: "Successfully purchased SEED"},
+	{Name: rpc.RPC_SOURCE_PORT, DataType: rpc.DataUint64, Value: DEST_PORT}, {Name: rpc.RPC_COMMENT, DataType: rpc.DataString, Value: "Thank you for supporting tree.market"},
 }
 
 var rpcClient jsonrpc.RPCClient
@@ -63,7 +61,7 @@ func listenForDeroPayments() {
 
 	var err error
 
-	for { // currently we traverse entire history
+	for {
 
 		time.Sleep(time.Second)
 
@@ -96,7 +94,7 @@ func listenForDeroPayments() {
 
 			// check whether this service should handle the transfer
 			if !e.Payload_RPC.Has(rpc.RPC_DESTINATION_PORT, rpc.DataUint64) ||
-				DEST_PORT != e.Payload_RPC.Value(rpc.RPC_DESTINATION_PORT, rpc.DataUint64).(uint64) { // this service is expecting value to be specfic
+				DEST_PORT != e.Payload_RPC.Value(rpc.RPC_DESTINATION_PORT, rpc.DataUint64).(uint64) {
 				continue
 
 			}
@@ -119,6 +117,24 @@ func listenForDeroPayments() {
 			if openInvoice.SeedSent == openInvoice.Quantity {
 				continue
 			}
+			fmt.Println(openInvoice)
+			fmt.Println(openInvoice.Quantity)
+
+			var expectedDero = uint64(0)
+			for _, payment := range openInvoice.Payments {
+				fmt.Println("checking currency: ", payment.Currency)
+				if payment.Currency == "dero" {
+					fmt.Println("found dero")
+					fmt.Println("amount:", payment.Amount)
+					amountFloat, _ := strconv.ParseFloat(payment.Amount, 64)
+					expectedDero = uint64(amountFloat * 100000)
+
+				}
+			}
+			if e.Amount != expectedDero {
+				fmt.Println("got: ", e.Amount, "wanted: ", expectedDero)
+				continue
+			}
 
 			logger.V(1).Info("tx should be processed", "txid", e.TXID)
 
@@ -133,7 +149,7 @@ func listenForDeroPayments() {
 				logger.Error(err, "err while while parsing incoming addr")
 				continue
 			}
-			addr.Mainnet = false // convert addresses to testnet form, by default it's expected to be mainnnet
+			//addr.Mainnet = false // convert addresses to testnet form, by default it's expected to be mainnnet
 			destination_expected = addr.String()
 
 			logger.V(1).Info("tx should be replied", "txid", e.TXID, "replyback_address", destination_expected)
@@ -142,23 +158,26 @@ func listenForDeroPayments() {
 
 			// value received is what we are expecting, so time for response
 			response[0].Value = e.SourcePort // source port now becomes destination port, similar to TCP
-			response[2].Value = fmt.Sprintf("Sucessfully purchased SEED.You sent %s at height %d", walletapi.FormatMoney(e.Amount), e.Height)
+			/* response[2].Value = fmt.Sprintf("Sucessfully purchased SEED.You sent %s at height %d", walletapi.FormatMoney(e.Amount), e.Height)
 
 			seedPriceInDero := seedPrice / float64(utils.Prices["DERO-USDT"].Price)
 			extraDero := e.Amount - uint64(float64(e.Amount)/seedPriceInDero)
-			fmt.Println("new change!!", extraDero)
+			fmt.Println("new change!!", extraDero) */
 
-			seedAmtFloat := float64(e.Amount) * float64(utils.Prices["DERO-USDT"].Price) / seedPrice / 100000
+			/* seedAmtFloat := float64(e.Amount) * float64(utils.Prices["DERO-USDT"].Price) / seedPrice / 100000
 			fmt.Println("seedAmtFloat", seedAmtFloat)
 			change := uint64((seedAmtFloat - math.Floor(seedAmtFloat)) * 100000)
 			fmt.Println("change", change)
-			seedAmt := uint64(float64(e.Amount)*float64(utils.Prices["DERO-USDT"].Price)/seedPrice) / 100000
+			seedAmt := float64(e.Amount) * float64(utils.Prices["DERO-USDT"].Price) / seedPrice / 100000
 			//withdrawSeed(seedAmt)
-			openInvoice.Quantity = seedAmt
+			openInvoice.Quantity = seedAmt */
 
 			if openInvoice.DeroAddress == "" {
 				openInvoice.DeroAddress = destination_expected
 			}
+			openInvoice.Currency = "dero"
+			openInvoice.CryptoReceived = fmt.Sprint(float64(e.Amount) / 100000)
+			openInvoice.IncomingTXID = e.TXID
 			withdrawSeedPublicly(openInvoice)
 			//sendSeedPrivately(openInvoice)
 

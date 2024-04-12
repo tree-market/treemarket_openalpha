@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"strings"
 	. "tree_service/types"
 )
 
@@ -30,7 +29,7 @@ func pullLatestBitcart(invoice *SeedInvoice) *SeedInvoice {
 }
 
 func getBitcartInvoice(id string) (*BitcartInvoice, error) {
-	url := fmt.Sprintf("http://127.0.0.1:80/api/invoices/%s", id)
+	url := fmt.Sprintf("https://bitcart.tree.market/api/invoices/%s", id)
 	response, err := http.Get(url)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -56,7 +55,7 @@ func getBitcartInvoice(id string) (*BitcartInvoice, error) {
 
 func getBitcartInvoiceStatus(id string) (string, error) {
 
-	url := fmt.Sprintf("http://127.0.0.1:80/api/invoices/%s", id)
+	url := fmt.Sprintf("https://bitcart.tree.market/api/invoices/%s", id)
 	response, err := http.Get(url)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -82,7 +81,7 @@ func getBitcartInvoiceStatus(id string) (string, error) {
 
 // TO-DO: RETURN INVOICE DATA ONLY
 func checkInvoice(id string) {
-	url := fmt.Sprintf("http://127.0.0.1:80/api/invoices/%s", id)
+	url := fmt.Sprintf("https://bitcart.tree.market/api/invoices/%s", id)
 	response, err := http.Get(url)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -112,7 +111,7 @@ func checkInvoice(id string) {
 	if invoice.Status == "complete" {
 		var usdPaid float64
 		for _, payment := range invoice.Payments {
-			if strings.ToLower(invoice.Currency) == payment.Currency {
+			if invoice.Currency == payment.Symbol { //modified tolower
 				rate, err := strconv.ParseFloat(payment.Rate, 64)
 				if err != nil {
 					fmt.Println("Error:", err)
@@ -139,8 +138,8 @@ func checkInvoice(id string) {
 
 func newBitcartInvoice(price float64) (*BitcartInvoice, error) {
 	// Define the URL and access token
-	url := "http://127.0.0.1:80/api/invoices"
-	accessToken := "v_zPRoEXLFZzXwO1SozlvpUYyz4wYkOHLDzPotOFW94"
+	url := "https://bitcart.tree.market/api/invoices"
+	accessToken := "eI8wBGPsZNxkGOEaayDRtVGD2pkdqt0k_UoKVcdQNcA"
 
 	priceStr := strconv.FormatFloat(price, 'f', 2, 64)
 
@@ -148,7 +147,7 @@ func newBitcartInvoice(price float64) (*BitcartInvoice, error) {
 
 		Address: "dero1qyfq8m3rju62tshju60zuc0ymrajwxqajkdh6pw888ejuv94jlfgjqq58px98",
 		Price:   priceStr,
-		Store:   "rJlHEDaalwynxddOPRaaLrPFAPLfYgoo",
+		Store:   "ggUMtJAehjHXYdoQrTTmaPfSyJzzAuIx",
 	}
 
 	// Marshal the invoice data into JSON format

@@ -12,41 +12,40 @@ import (
 
 // this one sends direct from contract
 func withdrawSeedPublicly(invoice *SeedInvoice) {
+	invoice.CompletedTimestamp = time.Now().Format(("3:04 PM 1/2/2006"))
 	if invoice.DeroAddress == "" {
-		if invoice.Email == "" {
-			invoice.Status = "missing_address"
+		/* if invoice.Email == "" {
+		invoice.Status = "missing_address" */
 
-		} else {
-			invoice.Status = "unredeemed"
-			password, err := utils.GenerateRandomPassword(18)
-			hash := utils.CalculateSHA256(password)
-			invoice.Password = password
-			if err != nil {
-				fmt.Println("Error generating password: ", err)
-			}
-
-			//withdraw and store for user
-			//or keep in contract with secret code
-			var result rpc.Transfer_Result
-			tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "ReserveTokens"}, {Name: "amount", DataType: "U", Value: invoice.Quantity}, {Name: "token", DataType: "S", Value: SEED_SCID}, {Name: "hash", DataType: "S", Value: hash}}}
-
-			err = rpcClient.CallFor(&result, "Transfer", tparams)
-			if err != nil {
-				logger.Error(err, "err while transfer")
-				return
-			}
-
-			//withdraw on behalf of user
-			//get txid
-			//if successful,
-
-			invoice.SeedOutTXID = result.TXID
-			invoice.SeedSent = invoice.Quantity
+		invoice.Status = "unredeemed"
+		password, err := utils.GenerateRandomPassword(18)
+		hash := utils.CalculateSHA256(invoice.SeedID + password + invoice.Currency + invoice.CryptoReceived)
+		invoice.Password = password
+		if err != nil {
+			fmt.Println("Error generating password: ", err)
 		}
+
+		//withdraw and store for user
+		//or keep in contract with secret code
+		var result rpc.Transfer_Result
+		tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "ReserveTokens"}, {Name: "amount", DataType: "U", Value: uint64(invoice.Quantity * 100000)}, {Name: "hash", DataType: "S", Value: hash}}}
+
+		err = rpcClient.CallFor(&result, "Transfer", tparams)
+		if err != nil {
+			logger.Error(err, "err while transfer")
+			return
+		}
+
+		//withdraw on behalf of user
+		//get txid
+		//if successful,
+
+		invoice.SeedOutTXID = result.TXID
+		invoice.SeedSent = invoice.Quantity
 
 	} else {
 		var result rpc.Transfer_Result
-		tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "WithdrawPublic"}, {Name: "amount", DataType: "U", Value: invoice.Quantity}, {Name: "token", DataType: "S", Value: SEED_SCID}, {Name: "recipient", DataType: "S", Value: invoice.DeroAddress}}}
+		tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "WithdrawPublic"}, {Name: "amount", DataType: "U", Value: uint64(invoice.Quantity * 100000)}, {Name: "recipient", DataType: "S", Value: invoice.DeroAddress}}}
 
 		err := rpcClient.CallFor(&result, "Transfer", tparams)
 		if err != nil {
@@ -79,7 +78,7 @@ func sendSeedPrivately(invoice *SeedInvoice) {
 
 	} else {
 		var result rpc.Transfer_Result
-		tparams := rpc.Transfer_Params{Transfers: []rpc.Transfer{{Destination: invoice.DeroAddress, SCID: crypto.HashHexToHash(SEED_SCID), Amount: invoice.Quantity}, {Destination: invoice.DeroAddress, Amount: 1, Payload_RPC: response}}}
+		tparams := rpc.Transfer_Params{Transfers: []rpc.Transfer{{Destination: invoice.DeroAddress, SCID: crypto.HashHexToHash(SEED_SCID), Amount: uint64(invoice.Quantity * 100000)}, {Destination: invoice.DeroAddress, Amount: 1, Payload_RPC: response}}}
 		err := rpcClient.CallFor(&result, "Transfer", tparams)
 		if err != nil {
 			logger.Error(err, "err while transfer")

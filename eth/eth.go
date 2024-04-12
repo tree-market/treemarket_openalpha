@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -20,12 +21,12 @@ import (
 )
 
 var counts = make(map[int]map[int]int)
-var countsB = make(map[uint64][]bool)
+var countsB = make(map[float64][]bool)
 var mutex sync.Mutex
 
-const MATIC_ADDRESS = "0xb22A09bf7199d816BD558e7090981a22f3bA44fE"
-const ETH_ADDRESS = "0x53B67954Aab580c07f7C663B3a5574ED6a7DDE69"
-const TRX_ADDRESS = "TVq71xfs63zggngCBDUPEzYGLpiFYXLN5j"
+const MATIC_ADDRESS = "0x5BBD9Ab48C6F01D9A3729e92115e444B4E5785EC"
+const ETH_ADDRESS = "0x6a25E3d4C99E026023E00B69246A6983E312b07C"
+const TRX_ADDRESS = "TAbuQMqepEFtfMDjmtvnsRRGkdA7zBLYnG"
 
 // need access to eth node
 var ethEndpoint = "https://eth-mainnet.g.alchemy.com/v2/"
@@ -52,7 +53,7 @@ func ConnectToEth() {
 }
 
 func getAllTransfers(fromBlock string, endpoint string, toAddress string) []Transfer {
-
+	fmt.Println(fromBlock, toAddress, endpoint)
 	payload := map[string]interface{}{
 		"id":      1,
 		"jsonrpc": "2.0",
@@ -65,7 +66,7 @@ func getAllTransfers(fromBlock string, endpoint string, toAddress string) []Tran
 				"withMetadata":     false,
 				"excludeZeroValue": true,
 				"maxCount":         "0x3e8",
-				"category":         []string{"external"},
+				"category":         []string{"external", "erc20"},
 			},
 		},
 	}
@@ -126,19 +127,24 @@ func SearchEthTransfers(invoice *SeedInvoice) bool {
 		}
 		latestTransfers := getAllTransfers(fromBlock, endpoint, toAddress) //or notupdate to have variable currency in getall
 		for _, transfer := range latestTransfers {
-			fmt.Println(transfer.Currency)
+			fmt.Println(transfer)
+			fmt.Println("received: ", transfer.Quantity, strings.ToLower(transfer.Currency))
 			for _, payment := range invoice.Payments {
 				amount, err := strconv.ParseFloat(payment.Amount, 64)
+				fmt.Println("want: ", amount, strings.ToLower(payment.Currency))
 				if err != nil {
 					fmt.Println("Error", err)
 				}
 
-				if transfer.Quantity == amount && strings.ToLower(transfer.Currency) == payment.Currency {
+				if transfer.Quantity == amount && strings.ToLower(transfer.Currency) == strings.ToLower(payment.Currency) { //modified tolower
+					fmt.Println("we did it reddit")
 
-					blockTime := getBlockTimeStamp(transfer.Block)
+					blockTime := getBlockTimeStamp(chain, transfer.Block)
+					fmt.Println(blockTime, invoiceTime, invoiceTime+900)
 					if blockTime > invoiceTime && blockTime < invoiceTime+900 {
 						invoice.IncomingTXID = transfer.TXID
 						invoice.Currency = transfer.Currency
+						invoice.CryptoReceived = fmt.Sprint(amount)
 						return true
 					}
 
@@ -169,7 +175,7 @@ func GetNextEthID(quantity uint64) string {
 
 }
 
-func GetNextEthIDB(quantity uint64) string {
+func GetNextEthIDB(quantity float64) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if _, ok := countsB[quantity]; !ok {
@@ -187,19 +193,26 @@ func GetNextEthIDB(quantity uint64) string {
 	return "99"
 }
 
-func startEthIDTimer(quantity uint64, id int) {
+func startEthIDTimer(quantity float64, id int) {
 	time.Sleep(time.Second * 900)
 	countsB[quantity][id] = false
 }
 
-func ClearEthID(quantity uint64, id int) {
+func ClearEthID(quantity float64, id int) {
 	if _, ok := countsB[quantity]; !ok {
 		return
 	}
 	countsB[quantity][id] = false
 }
 
-func getBlockTimeStamp(blockNumber string) int64 {
+func getBlockTimeStamp(chain string, blockNumber string) int64 {
+	endpoint := ""
+	if chain == "eth" {
+		endpoint = ethEndpoint
+	}
+	if chain == "matic" {
+		endpoint = polygonEndpoint
+	}
 
 	payload := map[string]interface{}{
 		"id":      1,
@@ -213,7 +226,7 @@ func getBlockTimeStamp(blockNumber string) int64 {
 		return 0
 	}
 
-	req, err := http.NewRequest("POST", polygonEndpoint, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Println("error req: ", err)
 		return 0
@@ -306,7 +319,7 @@ func searchTron(invoice *SeedInvoice) bool {
 	var amount string
 
 	for _, pmt := range invoice.Payments {
-		if pmt.Currency == "trx" {
+		if pmt.Currency == "trx" && pmt.Symbol == "trx" {
 			amount = pmt.Amount
 
 		}
@@ -334,9 +347,10 @@ func searchTron(invoice *SeedInvoice) bool {
 		return false
 
 	}
+	fmt.Println("tron tron response", response)
 	for _, transfer := range response.Data {
 		for _, contract := range transfer.Raw.Contract {
-			amountStr := strconv.FormatFloat(float64(contract.Param.Value.Amount)/1e6, 'f', -1, 64)
+			amountStr := strconv.FormatFloat(float64(contract.Param.Value.Amount)/1e6, 'f', 5, 64)
 			fmt.Println("expect:", amount, "got:", amountStr)
 			if amountStr == amount {
 				invoice.Currency = "trx"
@@ -345,6 +359,59 @@ func searchTron(invoice *SeedInvoice) bool {
 				return true
 			}
 
+		}
+
+	}
+
+	return searchTronUSDT(invoice)
+}
+
+func searchTronUSDT(invoice *SeedInvoice) bool {
+	var amount string
+
+	for _, pmt := range invoice.Payments {
+		if pmt.Symbol == "USDT" {
+			amount = pmt.Amount
+
+		}
+	}
+
+	unixTime := strconv.FormatInt(utils.GetUnixTime(invoice.Created)*1000, 10)
+	url := "https://api.trongrid.io/v1/accounts/" + TRX_ADDRESS + "/transactions/trc20?contract_address=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&only_to=true&min_timestamp=" + unixTime
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("accept", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("error with res", err)
+		return false
+	}
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println("body", string(body))
+	var response TRC20Response
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		fmt.Println("error marshal2: ", err)
+		return false
+
+	}
+
+	for _, transfer := range response.Data {
+		fmt.Println(transfer)
+
+		expectedFloat, _ := strconv.ParseFloat(amount, 64)
+		//actualFloat, _ := strconv.ParseFloat(transfer.Amount, 64)
+		fmt.Println("expect:", strconv.FormatFloat(expectedFloat*math.Pow10(6), 'f', -1, 64), "got:", transfer.Amount)
+		if strconv.FormatFloat(expectedFloat*math.Pow10(6), 'f', -1, 64) == transfer.Amount {
+			invoice.Currency = "USDT"
+			invoice.CryptoReceived = amount
+			invoice.IncomingTXID = transfer.TXID
+			return true
 		}
 
 	}

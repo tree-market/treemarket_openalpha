@@ -39,6 +39,7 @@ type PriceData struct {
 type BitcartPayment struct {
 	Rate     string `json:"rate"`
 	Currency string `json:"currency"`
+	Symbol   string `json:"symbol"`
 	Amount   string `json:"amount"`
 	Address  string `json:"payment_address"`
 	URL      string `json:"payment_url"`
@@ -58,27 +59,28 @@ type BitcartInvoice struct {
 }
 
 type SeedInvoice struct {
-	SeedID         string
-	Quantity       uint64
-	Currency       string
-	Status         string
-	CryptoReceived string
-	CryptoRefunded uint64
-	Email          string
-	DeroAddress    string
-	SeedSent       uint64
-	BitcartID      string
-	IncomingTXID   string
-	SeedOutTXID    string
-	RefundTXID     string
-	Created        string
-	Timeout        uint64
-	Integrated     string
-	Payments       []BitcartPayment
-	BitcartStatus  string
-	Password       string
-	EthID          int
-	Blocks         Blocks
+	SeedID             string
+	Quantity           float64
+	Currency           string
+	Status             string
+	CryptoReceived     string
+	CryptoRefunded     uint64
+	Email              string
+	DeroAddress        string
+	SeedSent           float64
+	BitcartID          string
+	IncomingTXID       string
+	SeedOutTXID        string
+	RefundTXID         string
+	Created            string
+	Timeout            uint64
+	Integrated         string
+	Payments           []BitcartPayment
+	BitcartStatus      string
+	Password           string
+	EthID              int
+	Blocks             Blocks
+	CompletedTimestamp string
 }
 
 type Blocks struct {
@@ -128,4 +130,13 @@ type TronParam struct {
 
 type TronValue struct {
 	Amount uint64 `json:"amount"`
+}
+
+type TRC20Response struct {
+	Data []TRC20Tran `json:"data"`
+}
+
+type TRC20Tran struct {
+	Amount string `json:"value"`
+	TXID   string `json:"transaction_id"`
 }

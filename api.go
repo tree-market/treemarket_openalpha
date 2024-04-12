@@ -17,6 +17,7 @@ import (
 )
 
 func newTreeInvoice(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("creating new invoice")
 	var invoice SeedInvoice
 	err := json.NewDecoder(r.Body).Decode(&invoice)
 	if err != nil {
@@ -40,7 +41,7 @@ func newTreeInvoice(w http.ResponseWriter, r *http.Request) {
 	integratedAddress := getUniqueIntegratedAddress(uint64(deroPrice*100000), invoice.SeedID)
 
 	invoice.Integrated = integratedAddress
-	deroPayment := BitcartPayment{Rate: deroRate, Currency: "dero", Amount: deroAmount, Address: integratedAddress}
+	deroPayment := BitcartPayment{Rate: deroRate, Currency: "dero", Symbol: "dero", Amount: deroAmount, Address: integratedAddress}
 
 	bitcartInvoice, err := newBitcartInvoice(usdPrice)
 	if err != nil {
@@ -104,6 +105,11 @@ func checkInvoiceStatus(w http.ResponseWriter, r *http.Request) {
 	//CASE 2: OPEN. CHECK BITCART
 	if invoice.Status == "open" {
 		invoice = pullLatestBitcart(invoice)
+		//if bitstatus is expired, it's expired
+		if invoice.BitcartStatus == "expired" {
+			invoice.Status = "expired"
+			return
+		}
 		//if bitstatus is complete
 		//send seed
 		ethPaid := eth.SearchEthTransfers(invoice)

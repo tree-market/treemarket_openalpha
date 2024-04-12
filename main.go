@@ -32,7 +32,7 @@ var DEROUSD float64
 
 const PLUGIN_NAME = "tree_service"
 
-var seedPrice = 1.99
+var seedPrice = 2.99
 
 var logger logr.Logger = logr.Discard()
 
@@ -41,7 +41,7 @@ var connected bool = false
 func initRPCClient() {
 	for !connected {
 		fmt.Println("trying to connect")
-		rpcClient = jsonrpc.NewClient("http://127.0.0.1:30000/json_rpc")
+		rpcClient = jsonrpc.NewClient("http://127.0.0.1:10103/json_rpc")
 
 		var addr_result rpc.GetAddress_Result
 		err := rpcClient.CallFor(&addr_result, "GetAddress")
@@ -62,7 +62,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/service/checkInvoiceStatus/{id}", checkInvoiceStatus).Methods("GET")
 
-	router.HandleFunc("/service/newTreeInvoice/", newTreeInvoice).Methods("GET")
+	router.HandleFunc("/service/newTreeInvoice/", newTreeInvoice).Methods("POST")
 
 	var err error
 
@@ -120,10 +120,9 @@ func main() {
 	fmt.Printf("Integrated address to activate '%s', service: \n%s\n", PLUGIN_NAME, service_address.String())
 
 	go utils.GetPrices()
-	go updateSeedPriceTicker()
 
 	go listenForDeroPayments()
-	log.Fatal(http.ListenAndServe(":5000", router))
+	log.Fatal(http.ListenAndServe(":5001", router))
 
 }
 
