@@ -16,11 +16,19 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func checkTransaction(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	txid := vars["txid"]
+
+	utils.CheckDeroTransaction(txid)
+}
+
 func newTreeInvoice(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("creating new invoice")
 	var invoice SeedInvoice
 	err := json.NewDecoder(r.Body).Decode(&invoice)
 	if err != nil {
+		fmt.Println("error line 31 api.go")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -45,9 +53,15 @@ func newTreeInvoice(w http.ResponseWriter, r *http.Request) {
 
 	bitcartInvoice, err := newBitcartInvoice(usdPrice)
 	if err != nil {
-		fmt.Println("Error", err)
+		fmt.Println("Error creating new bitcart invoice", err)
 	}
-	invoice.Payments = append(bitcartInvoice.Payments, deroPayment)
+	if bitcartInvoice != nil {
+		fmt.Println(bitcartInvoice)
+		invoice.Payments = append(bitcartInvoice.Payments, deroPayment)
+	}
+	if bitcartInvoice == nil {
+		invoice.Payments = []BitcartPayment{deroPayment}
+	}
 
 	ethID := eth.GetNextEthIDB(invoice.Quantity)
 	for i := range invoice.Payments {
@@ -70,10 +84,16 @@ func newTreeInvoice(w http.ResponseWriter, r *http.Request) {
 	invoice.EthID = int(ethid)
 	invoice.Blocks.ETH = eth.GetLatestBlock("eth")
 	invoice.Blocks.MATIC = eth.GetLatestBlock("matic")
-	invoice.Timeout = bitcartInvoice.Timeout
-	invoice.Created = bitcartInvoice.Created
-	invoice.BitcartID = bitcartInvoice.ID
-	invoice.BitcartStatus = bitcartInvoice.Status
+	if bitcartInvoice != nil {
+		invoice.Timeout = bitcartInvoice.Timeout
+		invoice.Created = bitcartInvoice.Created
+		invoice.BitcartID = bitcartInvoice.ID
+		invoice.BitcartStatus = bitcartInvoice.Status
+	}
+	if bitcartInvoice == nil {
+		invoice.Status = "open"
+	}
+
 	invoice = addSeedInvoiceToDB(invoice)
 	// Marshal the invoice object into JSON
 	invoiceJSON, err := json.Marshal(invoice)
@@ -82,6 +102,8 @@ func newTreeInvoice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to marshal JSON", http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Println("invoice", invoiceJSON)
 
 	// Set the Content-Type header
 	w.Header().Set("Content-Type", "application/json")

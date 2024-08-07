@@ -28,14 +28,25 @@ func withdrawSeedPublicly(invoice *SeedInvoice) {
 		//withdraw and store for user
 		//or keep in contract with secret code
 		var result rpc.Transfer_Result
-		tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "ReserveTokens"}, {Name: "amount", DataType: "U", Value: uint64(invoice.Quantity * 100000)}, {Name: "hash", DataType: "S", Value: hash}}}
+		for {
 
-		err = rpcClient.CallFor(&result, "Transfer", tparams)
-		if err != nil {
-			logger.Error(err, "err while transfer")
-			return
+			tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "ReserveTokens"}, {Name: "amount", DataType: "U", Value: uint64(invoice.Quantity * 100000)}, {Name: "hash", DataType: "S", Value: hash}}}
+
+			err = rpcClient.CallFor(&result, "Transfer", tparams)
+			if err != nil {
+				logger.Error(err, "err while transfer")
+				return
+			}
+			fmt.Println("sent tokens: ", result.TXID)
+			fmt.Println("Wait 3 seconds")
+			time.Sleep(time.Second * 3)
+			fmt.Println("Finished waiting")
+			if utils.CheckDeroTransaction(result.TXID) {
+				fmt.Println("Transaction success")
+				break
+			}
+			fmt.Println("Transaction fail")
 		}
-
 		//withdraw on behalf of user
 		//get txid
 		//if successful,
@@ -46,12 +57,23 @@ func withdrawSeedPublicly(invoice *SeedInvoice) {
 	} else {
 		var result rpc.Transfer_Result
 		tparams := rpc.Transfer_Params{Ringsize: 2, SC_ID: DISTRIBUTOR_SCID, SC_RPC: []rpc.Argument{{Name: "entrypoint", DataType: "S", Value: "WithdrawPublic"}, {Name: "amount", DataType: "U", Value: uint64(invoice.Quantity * 100000)}, {Name: "recipient", DataType: "S", Value: invoice.DeroAddress}}}
-
-		err := rpcClient.CallFor(&result, "Transfer", tparams)
-		if err != nil {
-			logger.Error(err, "err while transfer")
-			return
+		for {
+			err := rpcClient.CallFor(&result, "Transfer", tparams)
+			if err != nil {
+				logger.Error(err, "err while transfer")
+				return
+			}
+			fmt.Println("sent tokens: ", result.TXID)
+			fmt.Println("Wait 3 seconds")
+			time.Sleep(time.Second * 3)
+			fmt.Println("Finished waiting")
+			if utils.CheckDeroTransaction(result.TXID) {
+				fmt.Println("Transaction success")
+				break
+			}
+			fmt.Println("Transaction fail")
 		}
+
 		//withdraw on behalf of user
 		//get txid
 		//if successful,

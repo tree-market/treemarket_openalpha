@@ -7,8 +7,11 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	. "tree_service/types"
+
+	"github.com/joho/godotenv"
 )
 
 func pullLatestBitcart(invoice *SeedInvoice) *SeedInvoice {
@@ -29,7 +32,13 @@ func pullLatestBitcart(invoice *SeedInvoice) *SeedInvoice {
 }
 
 func getBitcartInvoice(id string) (*BitcartInvoice, error) {
-	url := fmt.Sprintf("https://bitcart.tree.market/api/invoices/%s", id)
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env ", err)
+		return nil, err
+	}
+	apiURL := os.Getenv("BITCART_URL")
+	url := apiURL + "/" + id //fmt.Sprintf("https://bitcart.tree.market/api/invoices/%s", id)
 	response, err := http.Get(url)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -137,9 +146,14 @@ func checkInvoice(id string) {
 }
 
 func newBitcartInvoice(price float64) (*BitcartInvoice, error) {
-	// Define the URL and access token
-	url := "https://bitcart.tree.market/api/invoices"
-	accessToken := "eI8wBGPsZNxkGOEaayDRtVGD2pkdqt0k_UoKVcdQNcA"
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env", err)
+		return nil, err
+	}
+	url := os.Getenv("BITCART_URL")
+	accessToken := os.Getenv("BITCART_API")
+	storeID := os.Getenv("BITCART_STORE_ID")
 
 	priceStr := strconv.FormatFloat(price, 'f', 2, 64)
 
@@ -147,7 +161,7 @@ func newBitcartInvoice(price float64) (*BitcartInvoice, error) {
 
 		Address: "dero1qyfq8m3rju62tshju60zuc0ymrajwxqajkdh6pw888ejuv94jlfgjqq58px98",
 		Price:   priceStr,
-		Store:   "ggUMtJAehjHXYdoQrTTmaPfSyJzzAuIx",
+		Store:   storeID,
 	}
 
 	// Marshal the invoice data into JSON format
@@ -179,7 +193,7 @@ func newBitcartInvoice(price float64) (*BitcartInvoice, error) {
 
 	// Check the response status code
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Error:", resp.Status)
+		fmt.Println("Error(bitcart.go 196):", resp.Status)
 		return nil, err
 	}
 

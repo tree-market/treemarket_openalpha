@@ -138,19 +138,18 @@ func listenForDeroPayments() {
 
 			logger.V(1).Info("tx should be processed", "txid", e.TXID)
 
-			if !e.Payload_RPC.Has(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress) {
-				logger.Error(nil, fmt.Sprintf("user has not give his address so we cannot replyback")) // this is an unexpected situation
-				continue
-			}
+			destination_expected := ""
 
-			destination_expected := e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String()
-			addr, err := rpc.NewAddress(destination_expected)
-			if err != nil {
-				logger.Error(err, "err while while parsing incoming addr")
-				continue
+			if e.Payload_RPC.Has(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress) {
+				destination_expected = e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String()
+				addr, err := rpc.NewAddress(destination_expected)
+				if err != nil {
+					logger.Error(err, "err while while parsing incoming addr")
+					continue
+				}
+
+				destination_expected = addr.String()
 			}
-			//addr.Mainnet = false // convert addresses to testnet form, by default it's expected to be mainnnet
-			destination_expected = addr.String()
 
 			logger.V(1).Info("tx should be replied", "txid", e.TXID, "replyback_address", destination_expected)
 

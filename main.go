@@ -39,6 +39,7 @@ var logger logr.Logger = logr.Discard()
 var connected bool = false
 
 func initRPCClient() {
+
 	for !connected {
 		fmt.Println("trying to connect")
 		rpcClient = jsonrpc.NewClient("http://127.0.0.1:10103/json_rpc")
@@ -56,6 +57,29 @@ func initRPCClient() {
 }
 
 func main() {
+
+	file, err := os.OpenFile("app.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Error opening log file: %v", err)
+	}
+	defer file.Close()
+
+	// Set the file as the output for the logger
+	log.SetOutput(file)
+	defer func() {
+		if r := recover(); r != nil {
+			// Log the panic or handle it as needed
+			log.Println("Recovered from panic:", r)
+			// Restart the program by calling mainLogic again
+			main()
+		}
+	}()
+	// Call your original main logic (now named mainLogic)
+	mainLogic()
+
+}
+
+func mainLogic() {
 	initRPCClient()
 	eth.ConnectToEth()
 
@@ -63,6 +87,7 @@ func main() {
 	router.HandleFunc("/service/checkInvoiceStatus/{id}", checkInvoiceStatus).Methods("GET")
 
 	router.HandleFunc("/service/newTreeInvoice/", newTreeInvoice).Methods("POST")
+	router.HandleFunc("/service/checkTransaction/{txid}", checkTransaction).Methods("GET")
 
 	var err error
 

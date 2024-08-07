@@ -1,11 +1,13 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"net/http"
@@ -15,46 +17,114 @@ import (
 
 var Prices map[string]PriceData
 
+func CheckDeroTransaction(txid string) bool {
+	url := "http://tree.market:10102/json_rpc"
+
+	txids := []string{txid}
+
+	params := DeroReqParams{
+		TXIDs: txids,
+	}
+	request := DeroRequest{
+		Json:   "2.0",
+		ID:     "1",
+		Method: "DERO.GetTransaction",
+		Params: params,
+	}
+
+	requestData, err := json.Marshal(request)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return false
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestData))
+	if err != nil {
+		fmt.Println("Error creating http request:", err)
+		return false
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending HTTP request:", err)
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Error:", resp.Status)
+		return false
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading response body:", err)
+		return false
+	}
+	var respData DeroRequest
+	err = json.Unmarshal(body, &respData)
+	if err != nil {
+		fmt.Println("Error unmarshaling:", err)
+		return false
+	}
+	if respData.Result.TXData[0] != "" {
+		return true
+	}
+
+	return false
+}
+
 func GetPrices() {
 	for {
-		//TO-DO: CHECK DATE AND UPDATE SEED PRICE
-
 		url := "https://tradeogre.com/api/v1/markets"
 		response, err := http.Get(url)
 		if err != nil {
-			fmt.Println("Error:", err)
-
+			fmt.Println("Error making GET request:", err)
+			time.Sleep(time.Second * 60)
+			continue
 		}
 
-		// Read the response body
-		body, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			fmt.Println("Error reading response body:", err)
+		// Ensure the response body is closed to avoid resource leaks
+		if response != nil {
+			// Check for a successful status code
+			if response.StatusCode != http.StatusOK {
+				fmt.Printf("Received non-200 response code: %d\n", response.StatusCode)
+				response.Body.Close()
+				time.Sleep(time.Second * 60)
+				continue
+			}
 
-		}
-		//fmt.Println(string(body))
+			// Read the response body
+			body, err := ioutil.ReadAll(response.Body)
+			response.Body.Close() // Close the response body after reading
+			if err != nil {
+				fmt.Println("Error reading response body:", err)
+				time.Sleep(time.Second * 60)
+				continue
+			}
 
-		var allPrices []map[string]PriceData
-		err = json.Unmarshal([]byte(body), &allPrices)
-		if err != nil {
-			fmt.Println("Error:", err)
+			var allPrices []map[string]PriceData
+			err = json.Unmarshal(body, &allPrices)
+			if err != nil {
+				fmt.Println("Error unmarshaling JSON response:", err)
+				fmt.Printf("Response body: %s\n", string(body)) // Log the raw response body for debugging
+				time.Sleep(time.Second * 60)
+				continue
+			}
 
-		}
+			// Filter and extract specific symbols
+			symbolsToExtract := []string{"DERO-USDT", "LTC-USDT", "BTC-USDT", "ETH-USDT", "XMR-USDT", "MATIC-USDT", "BNB-USDT"}
 
-		// Filter and extract specific symbols
-		symbolsToExtract := []string{"DERO-USDT", "LTC-USDT", "BTC-USDT", "ETH-USDT", "XMR-USDT", "MATIC-USDT", "BNB-USDT"}
-		//STILL NEED BCH AND TRON
-		//MULTIPLE SOURCES WOULD BE IDEAL
-		Prices = make(map[string]PriceData)
-
-		for _, item := range allPrices {
-			for key, value := range item {
-				// Check if the symbol is in the symbolsToExtract list
-				if contains(symbolsToExtract, key) {
-					Prices[key] = value
-					continue
+			Prices = make(map[string]PriceData)
+			for _, item := range allPrices {
+				for key, value := range item {
+					if contains(symbolsToExtract, key) {
+						Prices[key] = value
+					}
 				}
 			}
+
+			fmt.Println("Updated prices:", Prices) // Log the updated prices
 		}
 
 		time.Sleep(time.Second * 60)

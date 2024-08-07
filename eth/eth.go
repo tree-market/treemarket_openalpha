@@ -37,6 +37,7 @@ var client *rpc.Client
 var err error
 
 func ConnectToEth() {
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -46,8 +47,10 @@ func ConnectToEth() {
 	client, err = rpc.Dial(ethEndpoint)
 	if err != nil {
 		fmt.Println("Error connecting to eth", err)
+
 		return
 	}
+
 	defer client.Close()
 
 }
@@ -131,12 +134,12 @@ func SearchEthTransfers(invoice *SeedInvoice) bool {
 			fmt.Println("received: ", transfer.Quantity, strings.ToLower(transfer.Currency))
 			for _, payment := range invoice.Payments {
 				amount, err := strconv.ParseFloat(payment.Amount, 64)
-				fmt.Println("want: ", amount, strings.ToLower(payment.Currency))
+				fmt.Println("want: ", amount, strings.ToLower(payment.Symbol))
 				if err != nil {
 					fmt.Println("Error", err)
 				}
 
-				if transfer.Quantity == amount && strings.ToLower(transfer.Currency) == strings.ToLower(payment.Currency) { //modified tolower
+				if transfer.Quantity == amount && strings.ToLower(transfer.Currency) == strings.ToLower(payment.Symbol) { //modified tolower
 					fmt.Println("we did it reddit")
 
 					blockTime := getBlockTimeStamp(chain, transfer.Block)
@@ -311,7 +314,7 @@ func GetLatestBlock(chain string) string {
 		fmt.Println("error marshal2: ", err)
 		return ""
 	}
-
+	fmt.Println("latest block", response.Result.Number)
 	return response.Result.Number
 }
 

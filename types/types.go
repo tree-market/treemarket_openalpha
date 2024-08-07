@@ -140,3 +140,19 @@ type TRC20Tran struct {
 	Amount string `json:"value"`
 	TXID   string `json:"transaction_id"`
 }
+
+type DeroRequest struct {
+	Json   string        `json:"jsonrpc"`
+	ID     string        `json:"id"`
+	Method string        `json:"method"`
+	Params DeroReqParams `json:"params"`
+	Result DeroResult    `json:"result"`
+}
+
+type DeroReqParams struct {
+	TXIDs []string `json:"txs_hashes"`
+}
+
+type DeroResult struct {
+	TXData []string `json:"txs_as_hex"`
+}
